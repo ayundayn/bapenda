@@ -33,12 +33,10 @@
     "vite": "^5.3.5"
   },
   "overrides": {
-    "prop-types": "15.8.1",
-    "sass": "1.76.0"
+    "prop-types": "15.8.1"
   },
   "resolutions": {
-    "prop-types": "15.8.1",
-    "sass": "1.76.0"
+    "prop-types": "15.8.1"
   },
   "browserslist": [
     ">= 1%",

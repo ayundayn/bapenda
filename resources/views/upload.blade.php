@@ -8,6 +8,12 @@
 
 @section('content')
   <h2>Upload Dua File Excel</h2>
+  @if (session('status'))
+  <div class="alert alert-info alert-dismissible fade show" role="alert">
+    {{ session('status') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+@endif
 
   <form action="{{ route('upload.proses') }}" method="POST" enctype="multipart/form-data">
       @csrf

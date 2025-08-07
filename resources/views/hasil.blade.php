@@ -7,8 +7,27 @@
 @endsection
 
 @section('content')
+
+@if ($data->count() === 0)
+    <div class="alert alert-info">
+      Data sedang diproses, harap tunggu...
+    </div>
+
+    {{-- Auto Refresh tiap 5 detik --}}
+    <script>
+      setTimeout(() => {
+        location.reload();
+      }, 5000); // 5 detik
+    </script>
+  @endif
+
 <div class="card">
-  <h5 class="card-header">Hasil Upload Excel</h5>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">Hasil Upload Excel</h5>
+    <a href="{{ route('download.excel') }}" class="btn btn-success">
+      <i class="bx bx-download"></i> Download Excel
+    </a>
+  </div>
   <div class="table-responsive text-nowrap">
     <table class="table">
       <thead class="table-light">
@@ -40,10 +59,4 @@
     </table>
   </div>
 </div>
-
-<br>
-
-<a href="{{ route('download.excel') }}" class="btn btn-success">
-  <i class="bx bx-download"></i> Download Excel
-</a>
 @endsection

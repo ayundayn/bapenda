@@ -16,9 +16,9 @@ Route::get('/forms/input-groups', [InputGroups::class, 'index'])->name('forms-in
 // tables
 Route::get('/tables/basic', [TablesBasic::class, 'index'])->name('tables-basic');
 
-Route::get('/', [TagihanController::class, 'index'])->name('upload.form');
+Route::get('/upload', [TagihanController::class, 'index'])->name('upload.form');
 Route::post('/proses', [TagihanController::class, 'proses'])->name('upload.proses');
-Route::get('/download', [TagihanController::class, 'download'])->name('upload.download');
-
+Route::get('/download', [TagihanController::class, 'download'])->name('download.excel');
+Route::get('/hasil', [TagihanController::class, 'hasil'])->name('hasil.view');
 //Route::post('/proses', [TagihanController::class, 'proses'])->name('proses.excel');
 Route::get('/download', [TagihanController::class, 'download'])->name('download.excel'); // ⬅ INI WAJIB ADA

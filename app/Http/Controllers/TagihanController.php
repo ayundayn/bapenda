@@ -10,6 +10,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Session;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use App\Jobs\ProsesTagihanJob;
+use Maatwebsite\Excel\HeadingRowImport;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class TagihanController extends Controller
 {
@@ -18,67 +21,28 @@ class TagihanController extends Controller
         return view('upload');
     }
 
-    public function proses(Request $request)
-    {
-        $request->validate([
-            'bank_excel' => 'required|file|mimes:xlsx,xls',
-            'vtax_excel' => 'required|file|mimes:xlsx,xls',
-        ]);
 
-        // Kosongkan tabel
-        HasilTagihan::truncate();
+public function proses(Request $request)
+{
+    $request->validate([
+        'bank_excel' => 'required|file|mimes:xlsx,xls',
+        'vtax_excel' => 'required|file|mimes:xlsx,xls',
+    ]);
 
-        // Ambil file Excel sebagai collection
-        $bank = Excel::toCollection(null, $request->file('bank_excel'))[0];
-        $vtax = Excel::toCollection(null, $request->file('vtax_excel'))[0];
+    $bankPath = $request->file('bank_excel')->store('uploads');
+    $vtaxPath = $request->file('vtax_excel')->store('uploads');
 
-        // Bersihkan baris kosong & header (jika perlu)
-        $bank = $bank->filter(function ($row) {
-            return isset($row[0]) && is_numeric(preg_replace('/[^0-9]/', '', $row[0]));
-        });
+    // Kirim ke antrian
+    ProsesTagihanJob::dispatch($bankPath, $vtaxPath);
 
-        $vtax = $vtax->filter(function ($row) {
-            return isset($row[0]) && is_numeric(preg_replace('/[^0-9]/', '', $row[0]));
-        });
+    return redirect()->route('hasil.view')->with('status', 'File sedang diproses. Silakan cek hasil beberapa saat lagi.');
+}
 
-        // Ubah ke format [NOP => nominal]
-        $bankData = collect($bank)->mapWithKeys(function ($row) {
-            $nop = trim($row[0]);
-            $nominal = str_replace([',', '.'], '', $row[1] ?? '0'); // hilangkan pemisah ribuan
-            return [$nop => (float) $nominal];
-        });
-
-        $vtaxData = collect($vtax)->mapWithKeys(function ($row) {
-            $nop = trim($row[0]);
-            $nominal = str_replace([',', '.'], '', $row[1] ?? '0');
-            return [$nop => (float) $nominal];
-        });
-
-        // Gabungkan semua NOP
-        $allNop = $bankData->keys()->merge($vtaxData->keys())->unique();
-
-        foreach ($allNop as $nop) {
-            $bankNominal = $bankData[$nop] ?? 0;
-            $vtaxNominal = $vtaxData[$nop] ?? 0;
-            $selisih = $bankNominal - $vtaxNominal;
-
-            // Hanya simpan kalau selisih ≠ 0
-            if ($selisih != 0) {
-                HasilTagihan::create([
-                    'nop_bank' => $bankData->has($nop) ? $nop : null,
-                    'nominal_bank' => $bankNominal,
-                    'nop_vtax' => $vtaxData->has($nop) ? $nop : null,
-                    'nominal_vtax' => $vtaxNominal,
-                    'selisih' => $selisih,
-                ]);
-            }
-        }
-
-        $data = HasilTagihan::all();
-
-        return view('hasil', ['data' => $data]);
-    }
-
+public function hasil()
+{
+    $data = HasilTagihan::all();
+    return view('hasil', ['data' => $data]);
+}
 
     public function download()
     {

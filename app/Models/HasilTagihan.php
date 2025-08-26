@@ -16,5 +16,6 @@ class HasilTagihan extends Model
         'nop_vtax',
         'nominal_vtax',
         'selisih',
+        'sheet_name',
     ];
 }

@@ -9,9 +9,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Imports\BankImport;
-use App\Imports\VTaxImport;
-
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ProsesTagihanJob implements ShouldQueue
 {
@@ -34,33 +32,60 @@ class ProsesTagihanJob implements ShouldQueue
         // Kosongkan tabel dulu
         HasilTagihan::truncate();
 
-        $bankCollection = Excel::toCollection(new BankImport, storage_path("app/{$this->bankPath}"))[0];
-        $vtaxCollection = Excel::toCollection(new VTaxImport, storage_path("app/{$this->vtaxPath}"))[0];    
+        // Load seluruh sheet dari Bank
+        $bankSheets = Excel::toCollection(null, storage_path('app/' . $this->bankPath));
+        $vtaxSheet = Excel::toCollection(null, storage_path('app/' . $this->vtaxPath))->first();
 
-        $bankData = $bankCollection->mapWithKeys(fn ($row) => [$row['nop'] => $row['nominal']]);
-        $vtaxData = $vtaxCollection->mapWithKeys(fn ($row) => [$row['nop'] => $row['nominal']]);
+        $reader = IOFactory::createReaderForFile(storage_path('app/' . $this->bankPath));
+        $spreadsheet = $reader->load(storage_path('app/' . $this->bankPath));
+        $sheetNames = $spreadsheet->getSheetNames();
 
-        $allNop = $bankData->keys()->merge($vtaxData->keys())->unique();
-        $insertData = [];
+        foreach ($bankSheets as $index => $sheetData) {
+            $sheetName = $sheetNames[$index] ?? 'Sheet ' . $index;
 
-        foreach ($allNop as $nop) {
-            $bankNominal = $bankData[$nop] ?? 0;
-            $vtaxNominal = $vtaxData[$nop] ?? 0;
-            $selisih = $bankNominal - $vtaxNominal;
+            $bankData = collect();
+            foreach ($sheetData as $row) {
+                $nop = $row['nop'] ?? $row[0] ?? null;
+                $nominal = $row['nominal'] ?? $row[1] ?? null;
 
-            if ($selisih != 0) {
-                $insertData[] = [
-                    'nop_bank' => $bankData->has($nop) ? $nop : null,
-                    'nominal_bank' => $bankNominal,
-                    'nop_vtax' => $vtaxData->has($nop) ? $nop : null,
-                    'nominal_vtax' => $vtaxNominal,
-                    'selisih' => $selisih,
-                ];
+                if ($nop && is_numeric($nominal)) {
+                    $bankData[$nop] = $nominal;
+                }
             }
-        }
 
-        foreach (array_chunk($insertData, 1000) as $chunk) {
-            HasilTagihan::insert($chunk);
+            $vtaxData = collect();
+            foreach ($vtaxSheet as $row) {
+                $nop = $row['nop'] ?? $row[0] ?? null;
+                $nominal = $row['nominal'] ?? $row[1] ?? null;
+
+                if ($nop && is_numeric($nominal)) {
+                    $vtaxData[$nop] = $nominal;
+                }
+            }
+
+            $allNop = $bankData->keys()->merge($vtaxData->keys())->unique();
+            $insertData = [];
+
+            foreach ($allNop as $nop) {
+                $bankNominal = $bankData[$nop] ?? 0;
+                $vtaxNominal = $vtaxData[$nop] ?? 0;
+                $selisih = $bankNominal - $vtaxNominal;
+
+                if ($selisih != 0) {
+                    $insertData[] = [
+                        'nop_bank' => $bankData->has($nop) ? $nop : null,
+                        'nominal_bank' => $bankNominal,
+                        'nop_vtax' => $vtaxData->has($nop) ? $nop : null,
+                        'nominal_vtax' => $vtaxNominal,
+                        'selisih' => $selisih,
+                        'sheet_name' => $sheetName, // Ini yang dipakai buat filter
+                    ];
+                }
+            }
+
+            foreach (array_chunk($insertData, 1000) as $chunk) {
+                HasilTagihan::insert($chunk);
+            }
         }
     }
 }

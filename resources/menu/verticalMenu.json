@@ -58,29 +58,9 @@
       ]
     },
     {
-      "menuHeader": "Forms & Tables"
-    },
-    {
-      "name": "Form Elements",
-      "icon": "menu-icon tf-icons bx bx-detail",
-      "slug": "forms",
-      "submenu": [
-        {
-          "url": "forms/basic-inputs",
-          "name": "Basic Inputs",
-          "slug": "forms-basic-inputs"
-        },
-        {
-          "url": "forms/input-groups",
-          "name": "Input groups",
-          "slug": "forms-input-groups"
-        }
-      ]
-    },
-    {
-      "url": "tables/basic",
+      "url": "upload",
       "icon": "menu-icon tf-icons bx bx-table",
-      "name": "Tables",
+      "name": "Rekonsiliasi",
       "slug": "tables-basic"
     }
   ]

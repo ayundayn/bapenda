@@ -22,27 +22,41 @@ class TagihanController extends Controller
     }
 
 
-public function proses(Request $request)
-{
-    $request->validate([
-        'bank_excel' => 'required|file|mimes:xlsx,xls',
-        'vtax_excel' => 'required|file|mimes:xlsx,xls',
-    ]);
+    public function proses(Request $request)
+    {
+        $request->validate([
+            'bank_excel' => 'required|file|mimes:xlsx,xls',
+            'vtax_excel' => 'required|file|mimes:xlsx,xls',
+        ]);
 
-    $bankPath = $request->file('bank_excel')->store('uploads');
-    $vtaxPath = $request->file('vtax_excel')->store('uploads');
+        $bankPath = $request->file('bank_excel')->store('uploads');
+        $vtaxPath = $request->file('vtax_excel')->store('uploads');
 
-    // Kirim ke antrian
-    ProsesTagihanJob::dispatch($bankPath, $vtaxPath);
+        // Kirim ke antrian (langsung proses semua sheet)
+        ProsesTagihanJob::dispatch($bankPath, $vtaxPath);
 
-    return redirect()->route('hasil.view')->with('status', 'File sedang diproses. Silakan cek hasil beberapa saat lagi.');
-}
+        return redirect()->route('hasil.view')->with('status', 'File sedang diproses. Silakan cek hasil beberapa saat lagi.');
+    }
 
-public function hasil()
-{
-    $data = HasilTagihan::all();
-    return view('hasil', ['data' => $data]);
-}
+    public function hasil(Request $request)
+    {
+        $perPage = $request->get('perPage', 10);
+        $selectedSheet = $request->get('sheet'); // ambil sheet yang dipilih user
+
+        // Ambil semua nama sheet unik dari DB
+        $sheetNames = HasilTagihan::select('sheet_name')->distinct()->pluck('sheet_name');
+
+        // Query hasil sesuai sheet
+        $query = HasilTagihan::query();
+
+        if ($selectedSheet) {
+            $query->where('sheet_name', $selectedSheet);
+        }
+
+        $data = $query->paginate($perPage);
+
+        return view('hasil', compact('data', 'sheetNames', 'selectedSheet'));
+    }
 
     public function download()
     {

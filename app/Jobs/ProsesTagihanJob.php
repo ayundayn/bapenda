@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -29,56 +30,93 @@ class ProsesTagihanJob implements ShouldQueue
         ini_set('max_execution_time', 0);
         ini_set('memory_limit', '1024M');
 
-        // Kosongkan tabel dulu
         HasilTagihan::truncate();
 
-        // Load seluruh sheet dari Bank
+        // Ambil semua sheet Bank & VTax
         $bankSheets = Excel::toCollection(null, storage_path('app/' . $this->bankPath));
-        $vtaxSheet = Excel::toCollection(null, storage_path('app/' . $this->vtaxPath))->first();
+        $vtaxSheets = Excel::toCollection(null, storage_path('app/' . $this->vtaxPath));
 
+        // === Parsing VTax dulu (hanya 1 sheet) ===
+        $vtaxData = collect();
+        $vtaxSheet = $vtaxSheets->first();
+        if ($vtaxSheet && !$vtaxSheet->isEmpty()) {
+            $vtaxHeader = $vtaxSheet->first()->map(fn($val) => strtolower(trim($val)));
+
+            $vtaxNopIndex = $vtaxHeader->search(fn($col) => Str::contains($col, 'nop'));
+            $vtaxNominalIndex = $vtaxHeader->search(fn($col) => Str::contains($col, 'nominal'));
+
+            if ($vtaxNopIndex !== false && $vtaxNominalIndex !== false) {
+                $vtaxData = $vtaxSheet->skip(1)
+                    ->map(function ($row) use ($vtaxNopIndex, $vtaxNominalIndex) {
+                        return [
+                            'nop'     => strtoupper(trim($row[$vtaxNopIndex] ?? '')),
+                            'nominal' => (float) ($row[$vtaxNominalIndex] ?? 0),
+                        ];
+                    })
+                    ->filter(fn($item) => $item['nop'] && is_numeric($item['nominal']))
+                    ->groupBy('nop')
+                    ->map(function ($rows) {
+                        return [
+                            'nop'     => $rows->first()['nop'],
+                            'nominal' => collect($rows)->sum('nominal'),
+                        ];
+                    });
+            }
+        }
+
+        // Ambil nama sheet dari file Bank
         $reader = IOFactory::createReaderForFile(storage_path('app/' . $this->bankPath));
         $spreadsheet = $reader->load(storage_path('app/' . $this->bankPath));
         $sheetNames = $spreadsheet->getSheetNames();
 
+        // === Proses setiap sheet Bank ===
         foreach ($bankSheets as $index => $sheetData) {
+            if ($sheetData->isEmpty()) continue;
+
             $sheetName = $sheetNames[$index] ?? 'Sheet ' . $index;
 
-            $bankData = collect();
-            foreach ($sheetData as $row) {
-                $nop = $row['nop'] ?? $row[0] ?? null;
-                $nominal = $row['nominal'] ?? $row[1] ?? null;
+            $header = $sheetData->first()->map(fn($val) => strtolower(trim($val)));
 
-                if ($nop && is_numeric($nominal)) {
-                    $bankData[$nop] = $nominal;
-                }
+            $nopIndex = $header->search(fn($col) => Str::contains($col, 'nop'));
+            $nominalIndex = $header->search(fn($col) => Str::contains($col, 'nominal'));
+
+            if ($nopIndex === false || $nominalIndex === false) {
+                continue;
             }
 
-            $vtaxData = collect();
-            foreach ($vtaxSheet as $row) {
-                $nop = $row['nop'] ?? $row[0] ?? null;
-                $nominal = $row['nominal'] ?? $row[1] ?? null;
+            $bankData = $sheetData->skip(1)
+                ->map(function ($row) use ($nopIndex, $nominalIndex) {
+                    return [
+                        'nop'     => strtoupper(trim($row[$nopIndex] ?? '')),
+                        'nominal' => (float) ($row[$nominalIndex] ?? 0),
+                    ];
+                })
+                ->filter(fn($item) => $item['nop'] && is_numeric($item['nominal']))
+                ->groupBy('nop')
+                ->map(function ($rows) {
+                    return [
+                        'nop'     => $rows->first()['nop'],
+                        'nominal' => collect($rows)->sum('nominal'),
+                    ];
+                });
 
-                if ($nop && is_numeric($nominal)) {
-                    $vtaxData[$nop] = $nominal;
-                }
-            }
-
-            $allNop = $bankData->keys()->merge($vtaxData->keys())->unique();
+            // === Bandingkan ===
+            $allKeys = $bankData->keys()->merge($vtaxData->keys())->unique();
             $insertData = [];
 
-            foreach ($allNop as $nop) {
-                $bankNominal = $bankData[$nop] ?? 0;
-                $vtaxNominal = $vtaxData[$nop] ?? 0;
-                $selisih = $bankNominal - $vtaxNominal;
+            foreach ($allKeys as $key) {
+                $bankNominal = $bankData[$key]['nominal'] ?? 0;
+                $vtaxNominal = $vtaxData[$key]['nominal'] ?? 0;
+                $selisih     = $bankNominal - $vtaxNominal;
 
                 if ($selisih != 0) {
                     $insertData[] = [
-                        'nop_bank' => $bankData->has($nop) ? $nop : null,
+                        'nop_bank'     => $bankData[$key]['nop'] ?? null,
                         'nominal_bank' => $bankNominal,
-                        'nop_vtax' => $vtaxData->has($nop) ? $nop : null,
+                        'nop_vtax'     => $vtaxData[$key]['nop'] ?? null,
                         'nominal_vtax' => $vtaxNominal,
-                        'selisih' => $selisih,
-                        'sheet_name' => $sheetName, // Ini yang dipakai buat filter
+                        'selisih'      => $selisih,
+                        'sheet_name'   => $sheetName,
                     ];
                 }
             }

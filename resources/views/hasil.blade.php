@@ -56,7 +56,7 @@
       </form>
 
       {{-- Tombol Download --}}
-      <a href="{{ route('download.excel') }}" class="btn btn-success btn-sm">
+      <a href="{{ route('download.excel', request()->only(['sheet'])) }}" class="btn btn-success btn-sm">
         <i class="bx bx-download"></i> Download Excel
       </a>
     </div>

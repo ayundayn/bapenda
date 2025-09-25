@@ -1,4 +1,5 @@
 <?php
+use App\Http\Controllers\HasilTagihanController;
 use App\Http\Controllers\TagihanController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\dashboard\Analytics;
@@ -18,7 +19,8 @@ Route::get('/tables/basic', [TablesBasic::class, 'index'])->name('tables-basic')
 
 Route::get('/upload', [TagihanController::class, 'index'])->name('upload.form');
 Route::post('/proses', [TagihanController::class, 'proses'])->name('upload.proses');
-Route::get('/download', [TagihanController::class, 'download'])->name('download.excel');
+// Route::get('/download', [TagihanController::class, 'download'])->name('download.excel');
 Route::get('/hasil', [TagihanController::class, 'hasil'])->name('hasil.view');
 //Route::post('/proses', [TagihanController::class, 'proses'])->name('proses.excel');
-Route::get('/download', [TagihanController::class, 'download'])->name('download.excel'); // ⬅ INI WAJIB ADA
+// Route::get('/download', [TagihanController::class, 'download'])->name('download.excel'); // ⬅ INI WAJIB ADA
+Route::get('/download-excel', [HasilTagihanController::class, 'downloadExcel'])->name('download.excel');

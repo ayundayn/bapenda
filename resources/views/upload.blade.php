@@ -1,6 +1,6 @@
 @extends('layouts/contentNavbarLayout')
 
-@section('title', 'Basic Inputs - Forms')
+@section('title', 'Rekonsiliasi')
 
 @section('page-script')
   @vite('resources/assets/js/form-basic-inputs.js')

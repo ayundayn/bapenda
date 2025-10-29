@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\HasilTagihan;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\HasilTagihanExport;
+use App\Exports\AllHasilTagihanExport;
 
 class HasilTagihanController extends Controller
 {
@@ -32,8 +33,13 @@ class HasilTagihanController extends Controller
 
   public function downloadExcel()
   {
-    $sheet = request('sheet');
+      $sheet = request('sheet');
 
-    return Excel::download(new HasilTagihanExport($sheet), 'hasil_rekon.xlsx');
+      if ($sheet) {
+          return Excel::download(new HasilTagihanExport($sheet), "hasil_rekon_{$sheet}.xlsx");
+      }
+
+      // Jika semua sheet ingin dijadikan satu file dengan banyak tab
+      return Excel::download(new AllHasilTagihanExport, 'hasil_rekon_semua_sheet.xlsx');
   }
 }

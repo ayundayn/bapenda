@@ -17,5 +17,6 @@ class HasilTagihan extends Model
         'nominal_vtax',
         'selisih',
         'sheet_name',
+        'tanggal'
     ];
 }

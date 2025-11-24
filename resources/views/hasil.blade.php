@@ -67,6 +67,7 @@
       <thead class="table-light">
         <tr>
           <th>No</th>
+          <th>Tanggal Bayar</th>
           <th>NOP Bank</th>
           <th>Nominal Bank</th>
           <th>NOP VTax</th>
@@ -78,6 +79,7 @@
         @forelse ($data as $index => $row)
           <tr>
             <td>{{ ($data->currentPage() - 1) * $data->perPage() + $index + 1 }}</td>
+            <td>{{ $row->tanggal_bank ? \Carbon\Carbon::parse($row->tanggal_bank)->format('d-m-Y') : '-' }}</td>
             <td>{{ $row->nop_bank ?? '-' }}</td>
             <td>Rp {{ number_format($row->nominal_bank, 0, ',', '.') }}</td>
             <td>{{ $row->nop_vtax ?? '-' }}</td>
@@ -86,7 +88,7 @@
           </tr>
         @empty
           <tr>
-            <td colspan="6" class="text-center text-muted">Tidak ada data ditampilkan.</td>
+            <td colspan="7" class="text-center text-muted">Tidak ada data ditampilkan.</td>
           </tr>
         @endforelse
       </tbody>

@@ -44,6 +44,7 @@ class HasilTagihanExport implements
                 'nominal_vtax',
                 'selisih',
                 'sheet_name',
+                'tanggal'
             ])
             ->when($this->sheet, function ($q) {
                 $q->where('sheet_name', $this->sheet);

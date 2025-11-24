@@ -79,26 +79,33 @@ class ProsesTagihanJob implements ShouldQueue
 
             $nopIndex = $header->search(fn($col) => Str::contains($col, 'nop'));
             $nominalIndex = $header->search(fn($col) => Str::contains($col, 'nominal'));
+            $tanggalIndex = $header->search(fn($col) => Str::contains($col, 'tanggal'));
 
             if ($nopIndex === false || $nominalIndex === false) {
                 continue;
             }
 
             $bankData = $sheetData->skip(1)
-                ->map(function ($row) use ($nopIndex, $nominalIndex) {
-                    return [
-                        'nop'     => strtoupper(trim($row[$nopIndex] ?? '')),
-                        'nominal' => (float) ($row[$nominalIndex] ?? 0),
-                    ];
-                })
-                ->filter(fn($item) => $item['nop'] && is_numeric($item['nominal']))
-                ->groupBy('nop')
-                ->map(function ($rows) {
-                    return [
-                        'nop'     => $rows->first()['nop'],
-                        'nominal' => collect($rows)->sum('nominal'),
-                    ];
-                });
+              ->map(function ($row) use ($nopIndex, $nominalIndex, $tanggalIndex) {
+                  return [
+                      'nop'     => strtoupper(trim($row[$nopIndex] ?? '')),
+                      'nominal' => (float) ($row[$nominalIndex] ?? 0),
+                      'tanggal' => isset($tanggalIndex) && $tanggalIndex !== false
+                          ? \PhpOffice\PhpSpreadsheet\Shared\Date::isDateTime($row[$tanggalIndex] ?? '')
+                              ? \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[$tanggalIndex])->format('Y-m-d')
+                              : trim($row[$tanggalIndex] ?? null)
+                          : null,
+                  ];
+              })
+              ->filter(fn($item) => $item['nop'] && is_numeric($item['nominal']))
+              ->groupBy('nop')
+              ->map(function ($rows) {
+                  return [
+                      'nop'     => $rows->first()['nop'],
+                      'nominal' => collect($rows)->sum('nominal'),
+                      'tanggal' => $rows->first()['tanggal'] ?? null,
+                  ];
+              });
 
             // === Bandingkan ===
             $allKeys = $bankData->keys()->merge($vtaxData->keys())->unique();
@@ -117,6 +124,7 @@ class ProsesTagihanJob implements ShouldQueue
                         'nominal_vtax' => $vtaxNominal,
                         'selisih'      => $selisih,
                         'sheet_name'   => $sheetName,
+                        'tanggal'      => $bankData[$key]['tanggal'] ?? null,
                     ];
                 }
             }

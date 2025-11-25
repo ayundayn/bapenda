@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 use App\Models\HasilTagihan;
-
+use App\Models\Progress;
 
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
@@ -32,8 +32,15 @@ class TagihanController extends Controller
         $bankPath = $request->file('bank_excel')->store('uploads');
         $vtaxPath = $request->file('vtax_excel')->store('uploads');
 
-        // Kirim ke antrian (langsung proses semua sheet)
-        ProsesTagihanJob::dispatch($bankPath, $vtaxPath);
+        // Buat progress baru
+         $progress = Progress::create([
+        'total' => 0,
+        'processed' => 0,
+        'status' => 'processing',
+    ]);
+
+    // 3. dispatch job
+    ProsesTagihanJob::dispatch($bankPath, $vtaxPath, $progress->id);
 
         return redirect()->route('hasil.view')->with('status', 'File sedang diproses. Silakan cek hasil beberapa saat lagi.');
     }

@@ -10,25 +10,31 @@ use App\Exports\AllHasilTagihanExport;
 
 class HasilTagihanController extends Controller
 {
-  public function index()
+  public function index(Request $request)
   {
-    $query = HasilTagihan::query();
+      // Ambil progress terbaru
+      $progress = \App\Models\Progress::latest()->first();
 
-    // Ambil semua nama sheet unik dari DB (sudah diisi saat job jalan)
-    $sheetNames = HasilTagihan::select('sheet_name')
-      ->distinct()
-      ->pluck('sheet_name');
+      // Ambil data hasil rekonsiliasi
+      $query = \App\Models\HasilTagihan::query();
 
-    // Filter berdasarkan sheet jika ada
-    if (request('sheet')) {
-      $query->where('sheet_name', request('sheet'));
-    }
+      // Filter berdasarkan sheet (kalau dipilih)
+      if ($request->sheet) {
+          $query->where('sheet_name', $request->sheet);
+      }
 
-    // Pagination dengan pilihan perPage
-    $perPage = request('perPage', 10);
-    $data = $query->paginate($perPage);
+      // Pagination
+      $data = $query->paginate($request->perPage ?? 10);
 
-    return view('hasil-upload.index', compact('data', 'sheetNames'));
+      // Nama semua sheet
+      $sheetNames = \App\Models\HasilTagihan::distinct()->pluck('sheet_name');
+
+      // Kirim ke view
+      return view('hasil-upload.index', [
+          'data'       => $data,
+          'sheetNames' => $sheetNames,
+          'progress'   => $progress, // <––– VARIABLE PROGRESS
+      ]);
   }
 
   public function downloadExcel()

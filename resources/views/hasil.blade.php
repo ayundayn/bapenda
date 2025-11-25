@@ -9,14 +9,43 @@
 @section('content')
 
 @if ($data->count() === 0)
-  <div class="alert alert-info">
-    Data sedang diproses, harap tunggu...
+  <div id="progressBox" style="display:none;">
+    <div class="alert alert-info">
+        Sedang memproses data...
+        <br>
+        <strong id="progressText">0 / 0</strong>
+        <div class="progress mt-2" style="height: 20px;">
+            <div id="progressBar" class="progress-bar" role="progressbar"></div>
+        </div>
+    </div>
   </div>
 
   <script>
-    setTimeout(() => {
-      location.reload();
-    }, 5000);
+  function checkProgress() {
+      fetch('/progress')
+          .then(res => res.json())
+          .then(data => {
+              if (!data) return;
+
+              document.getElementById('progressBox').style.display = 'block';
+              document.getElementById('progressText').innerText =
+                  `${data.processed} / ${data.total}`;
+
+              const percent = data.total > 0
+                  ? (data.processed / data.total * 100)
+                  : 0;
+
+              document.getElementById('progressBar').style.width = percent + '%';
+
+              if (data.status !== 'done') {
+                  setTimeout(checkProgress, 1500);
+              } else {
+                  location.reload();
+              }
+          });
+  }
+
+  checkProgress();
   </script>
 @endif
 

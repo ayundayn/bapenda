@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\HasilTagihan;
+use App\Models\Progress;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -18,11 +19,13 @@ class ProsesTagihanJob implements ShouldQueue
 
     protected $bankPath;
     protected $vtaxPath;
+    protected $progressId;
 
-    public function __construct($bankPath, $vtaxPath)
+    public function __construct($bankPath, $vtaxPath, $progressId)
     {
         $this->bankPath = $bankPath;
         $this->vtaxPath = $vtaxPath;
+        $this->progressId = $progressId;
     }
 
     public function handle(): void
@@ -32,99 +35,118 @@ class ProsesTagihanJob implements ShouldQueue
 
         HasilTagihan::truncate();
 
-        // Ambil semua sheet Bank & VTax
-        $bankSheets = Excel::toCollection(null, storage_path('app/' . $this->bankPath));
+        $progress = Progress::find($this->progressId);
+        $progress->update(['status' => 'processing']);
+
+        HasilTagihan::truncate();
+        // ================= TOTAL ROWS ====================
+        $total = 0;
+
+        // hitung total row VTax
         $vtaxSheets = Excel::toCollection(null, storage_path('app/' . $this->vtaxPath));
-
-        // === Parsing VTax dulu (hanya 1 sheet) ===
-        $vtaxData = collect();
-        $vtaxSheet = $vtaxSheets->first();
-        if ($vtaxSheet && !$vtaxSheet->isEmpty()) {
-            $vtaxHeader = $vtaxSheet->first()->map(fn($val) => strtolower(trim($val)));
-
-            $vtaxNopIndex = $vtaxHeader->search(fn($col) => Str::contains($col, 'nop'));
-            $vtaxNominalIndex = $vtaxHeader->search(fn($col) => Str::contains($col, 'nominal'));
-
-            if ($vtaxNopIndex !== false && $vtaxNominalIndex !== false) {
-                $vtaxData = $vtaxSheet->skip(1)
-                    ->map(function ($row) use ($vtaxNopIndex, $vtaxNominalIndex) {
-                        return [
-                            'nop'     => strtoupper(trim($row[$vtaxNopIndex] ?? '')),
-                            'nominal' => (float) ($row[$vtaxNominalIndex] ?? 0),
-                        ];
-                    })
-                    ->filter(fn($item) => $item['nop'] && is_numeric($item['nominal']))
-                    ->groupBy('nop')
-                    ->map(function ($rows) {
-                        return [
-                            'nop'     => $rows->first()['nop'],
-                            'nominal' => collect($rows)->sum('nominal'),
-                        ];
-                    });
-            }
+        foreach ($vtaxSheets as $sheet) {
+            $total += max(0, $sheet->count() - 1);
         }
 
-        // Ambil nama sheet dari file Bank
+        // hitung total row Bank
+        $bankSheets = Excel::toCollection(null, storage_path('app/' . $this->bankPath));
+        foreach ($bankSheets as $sheet) {
+            $total += max(0, $sheet->count() - 1);
+        }
+
+        // simpan total
+        $progress->update(['total' => $total]);
+
+        $processed = 0;
+
+        // ================= PROCESS VTAX ====================
+        $vtaxData = collect();
+        $vtaxSheet = $vtaxSheets->first();
+
+        if ($vtaxSheet && !$vtaxSheet->isEmpty()) {
+            $header = $vtaxSheet->first()->map(fn($v) => strtolower(trim($v)));
+
+            $nopIndex = $header->search(fn($c) => Str::contains($c, 'nop'));
+            $nominalIndex = $header->search(fn($c) => Str::contains($c, 'nominal'));
+
+            $vtaxData = $vtaxSheet->skip(1)
+                ->map(function ($row) use ($nopIndex, $nominalIndex) {
+                    return [
+                        'nop' => strtoupper(trim($row[$nopIndex] ?? '')),
+                        'nominal' => (float) ($row[$nominalIndex] ?? 0),
+                    ];
+                })
+                ->filter(fn($v) => $v['nop'])
+                ->groupBy('nop')
+                ->map(function ($rows) {
+                    return [
+                        'nop' => $rows->first()['nop'],
+                        'nominal' => collect($rows)->sum('nominal'),
+                    ];
+                });
+
+            // update progress
+            $processed += max(0, $vtaxSheet->count() - 1);
+            $progress->update(['processed' => $processed]);
+        }
+
+        // Ambil nama sheet Bank
         $reader = IOFactory::createReaderForFile(storage_path('app/' . $this->bankPath));
         $spreadsheet = $reader->load(storage_path('app/' . $this->bankPath));
         $sheetNames = $spreadsheet->getSheetNames();
 
-        // === Proses setiap sheet Bank ===
+        // ================= PROCESS BANK ====================
         foreach ($bankSheets as $index => $sheetData) {
             if ($sheetData->isEmpty()) continue;
 
-            $sheetName = $sheetNames[$index] ?? 'Sheet ' . $index;
+            $sheetName = $sheetNames[$index] ?? "Sheet $index";
 
-            $header = $sheetData->first()->map(fn($val) => strtolower(trim($val)));
+            $header = $sheetData->first()->map(fn($v) => strtolower(trim($v)));
 
-            $nopIndex = $header->search(fn($col) => Str::contains($col, 'nop'));
-            $nominalIndex = $header->search(fn($col) => Str::contains($col, 'nominal'));
-            $tanggalIndex = $header->search(fn($col) => Str::contains($col, 'tanggal'));
-
-            if ($nopIndex === false || $nominalIndex === false) {
-                continue;
-            }
+            $nopIndex = $header->search(fn($c) => Str::contains($c, 'nop'));
+            $nominalIndex = $header->search(fn($c) => Str::contains($c, 'nominal'));
+            $tanggalIndex = $header->search(fn($c) => Str::contains($c, 'tanggal'));
 
             $bankData = $sheetData->skip(1)
-              ->map(function ($row) use ($nopIndex, $nominalIndex, $tanggalIndex) {
-                  return [
-                      'nop'     => strtoupper(trim($row[$nopIndex] ?? '')),
-                      'nominal' => (float) ($row[$nominalIndex] ?? 0),
-                      'tanggal' => isset($tanggalIndex) && $tanggalIndex !== false
-                          ? \PhpOffice\PhpSpreadsheet\Shared\Date::isDateTime($row[$tanggalIndex] ?? '')
-                              ? \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[$tanggalIndex])->format('Y-m-d')
-                              : trim($row[$tanggalIndex] ?? null)
-                          : null,
-                  ];
-              })
-              ->filter(fn($item) => $item['nop'] && is_numeric($item['nominal']))
-              ->groupBy('nop')
-              ->map(function ($rows) {
-                  return [
-                      'nop'     => $rows->first()['nop'],
-                      'nominal' => collect($rows)->sum('nominal'),
-                      'tanggal' => $rows->first()['tanggal'] ?? null,
-                  ];
-              });
+                ->map(function ($row) use ($nopIndex, $nominalIndex, $tanggalIndex) {
+                    return [
+                        'nop'     => strtoupper(trim($row[$nopIndex] ?? '')),
+                        'nominal' => (float) ($row[$nominalIndex] ?? 0),
+                        'tanggal' => $row[$tanggalIndex] ?? null,
+                    ];
+                })
+                ->filter(fn($v) => $v['nop'])
+                ->groupBy('nop')
+                ->map(function ($rows) {
+                    return [
+                        'nop' => $rows->first()['nop'],
+                        'nominal' => collect($rows)->sum('nominal'),
+                        'tanggal' => $rows->first()['tanggal'],
+                    ];
+                });
 
-            // === Bandingkan ===
+            // Compare
             $allKeys = $bankData->keys()->merge($vtaxData->keys())->unique();
             $insertData = [];
 
             foreach ($allKeys as $key) {
-                $bankNominal = $bankData[$key]['nominal'] ?? 0;
-                $vtaxNominal = $vtaxData[$key]['nominal'] ?? 0;
-                $selisih     = $bankNominal - $vtaxNominal;
+                $bankRow = $bankData->get($key);
+                $vtaxRow = $vtaxData->get($key);
+
+                $bankNom = $bankRow['nominal'] ?? 0;
+                $vtaxNom = $vtaxRow['nominal'] ?? 0;
+
+                $selisih = $bankNom - $vtaxNom;
 
                 if ($selisih != 0) {
                     $insertData[] = [
-                        'nop_bank'     => $bankData[$key]['nop'] ?? null,
-                        'nominal_bank' => $bankNominal,
-                        'nop_vtax'     => $vtaxData[$key]['nop'] ?? null,
-                        'nominal_vtax' => $vtaxNominal,
+                        'nop_bank'     => $bankRow['nop'] ?? null,
+                        'nominal_bank' => $bankNom,
+                        'nop_vtax'     => $vtaxRow['nop'] ?? null,
+                        'nominal_vtax' => $vtaxNom,
                         'selisih'      => $selisih,
                         'sheet_name'   => $sheetName,
-                        'tanggal'      => $bankData[$key]['tanggal'] ?? null,
+                        'tanggal'      => null,
                     ];
                 }
             }
@@ -132,6 +154,13 @@ class ProsesTagihanJob implements ShouldQueue
             foreach (array_chunk($insertData, 1000) as $chunk) {
                 HasilTagihan::insert($chunk);
             }
+
+            // update progress setiap sheet
+             $processed++;
+            $progress->update(['processed' => $processed]);
         }
+
+        // selesai
+        $progress->update(['status' => 'done']);
     }
 }

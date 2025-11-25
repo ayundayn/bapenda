@@ -26,6 +26,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/proses', [TagihanController::class, 'proses'])->name('upload.proses');
     Route::get('/hasil', [TagihanController::class, 'hasil'])->name('hasil.view');
     Route::get('/download-excel', [HasilTagihanController::class, 'downloadExcel'])->name('download.excel');
+
+    Route::get('/progress', function () {
+      return \App\Models\Progress::latest()->first();
+    });
+
+    Route::get('/progress/{id}', function ($id) {
+      return \App\Models\Progress::find($id);
+    });
+
 });
 
 require __DIR__.'/auth.php';

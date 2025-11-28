@@ -4,16 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Progress extends Model
+class HasilVTax extends Model
 {
     // Nama tabel sesuai migration
-    protected $table = 'progresses';
+    protected $table = 'hasil_v_taxes';
 
-    // Kolom yang bisa diisi mass-assignment
+    // Kolom yang bisa mass-assignment
     protected $fillable = [
-        'total',
-        'processed',
-        'status',
+        'nop',
+        'nominal',
+        'tanggal',
     ];
 
     // Timestamps aktif (default Laravel)

@@ -108,7 +108,7 @@
         @forelse ($data as $index => $row)
           <tr>
             <td>{{ ($data->currentPage() - 1) * $data->perPage() + $index + 1 }}</td>
-            <td>{{ $row->tanggal_bank ? \Carbon\Carbon::parse($row->tanggal_bank)->format('d-m-Y') : '-' }}</td>
+            <td>{{ $row->tanggal ? \Carbon\Carbon::parse($row->tanggal)->format('d-m-Y') : '-' }}</td>
             <td>{{ $row->nop_bank ?? '-' }}</td>
             <td>Rp {{ number_format($row->nominal_bank, 0, ',', '.') }}</td>
             <td>{{ $row->nop_vtax ?? '-' }}</td>

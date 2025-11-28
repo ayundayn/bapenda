@@ -129,27 +129,28 @@ class ProsesTagihanJob implements ShouldQueue
             $allKeys = $bankData->keys()->merge($vtaxData->keys())->unique();
             $insertData = [];
 
-            foreach ($allKeys as $key) {
-                $bankRow = $bankData->get($key);
-                $vtaxRow = $vtaxData->get($key);
+            // ...
+foreach ($allKeys as $key) {
+    $bankRow = $bankData->get($key);
+    $vtaxRow = $vtaxData->get($key);
 
-                $bankNom = $bankRow['nominal'] ?? 0;
-                $vtaxNom = $vtaxRow['nominal'] ?? 0;
+    $bankNom = $bankRow['nominal'] ?? 0;
+    $vtaxNom = $vtaxRow['nominal'] ?? 0;
 
-                $selisih = $bankNom - $vtaxNom;
+    $selisih = $bankNom - $vtaxNom;
 
-                if ($selisih != 0) {
-                    $insertData[] = [
-                        'nop_bank'     => $bankRow['nop'] ?? null,
-                        'nominal_bank' => $bankNom,
-                        'nop_vtax'     => $vtaxRow['nop'] ?? null,
-                        'nominal_vtax' => $vtaxNom,
-                        'selisih'      => $selisih,
-                        'sheet_name'   => $sheetName,
-                        'tanggal'      => null,
-                    ];
-                }
-            }
+    if ($selisih != 0) {
+        $insertData[] = [
+            'nop_bank'     => $bankRow['nop'] ?? null,
+            'nominal_bank' => $bankNom,
+            'nop_vtax'     => $vtaxRow['nop'] ?? null,
+            'nominal_vtax' => $vtaxNom,
+            'selisih'      => $selisih,
+            'sheet_name'   => $sheetName,
+            'tanggal'      => $bankRow['tanggal'] ?? now()->format('Y-m-d'), // <--- fix disini
+        ];
+    }
+}
 
             foreach (array_chunk($insertData, 1000) as $chunk) {
                 HasilTagihan::insert($chunk);

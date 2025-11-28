@@ -10,42 +10,44 @@ use App\Exports\AllHasilTagihanExport;
 
 class HasilTagihanController extends Controller
 {
-  public function index(Request $request)
-  {
-      // Ambil progress terbaru
-      $progress = \App\Models\Progress::latest()->first();
+    public function index(Request $request)
+    {
+        $progress = \App\Models\Progress::latest()->first();
 
-      // Ambil data hasil rekonsiliasi
-      $query = \App\Models\HasilTagihan::query();
+        $query = \App\Models\HasilTagihan::query();
 
-      // Filter berdasarkan sheet (kalau dipilih)
-      if ($request->sheet) {
-          $query->where('sheet_name', $request->sheet);
-      }
+        // Filter berdasarkan sheet
+        if ($request->sheet) {
+            $query->where('sheet_name', $request->sheet);
+        }
 
-      // Pagination
-      $data = $query->paginate($request->perPage ?? 10);
+        // Filter berdasarkan tanggal jika dipilih
+        if ($request->tanggal) {
+            $query->whereDate('tanggal', $request->tanggal);
+        }
 
-      // Nama semua sheet
-      $sheetNames = \App\Models\HasilTagihan::distinct()->pluck('sheet_name');
+        // Pagination
+        $data = $query->paginate($request->perPage ?? 10);
 
-      // Kirim ke view
-      return view('hasil-upload.index', [
-          'data'       => $data,
-          'sheetNames' => $sheetNames,
-          'progress'   => $progress, // <––– VARIABLE PROGRESS
-      ]);
-  }
+        // Nama semua sheet
+        $sheetNames = \App\Models\HasilTagihan::distinct()->pluck('sheet_name');
 
-  public function downloadExcel()
-  {
-      $sheet = request('sheet');
+        return view('hasil-upload.index', [
+            'data'       => $data,
+            'sheetNames' => $sheetNames,
+            'progress'   => $progress,
+            'tanggal'    => $request->tanggal, // kirim ke view biar form tetap retain
+        ]);
+    }
 
-      if ($sheet) {
-          return Excel::download(new HasilTagihanExport($sheet), "hasil_rekon_{$sheet}.xlsx");
-      }
+    public function downloadExcel()
+    {
+        $sheet = request('sheet');
 
-      // Jika semua sheet ingin dijadikan satu file dengan banyak tab
-      return Excel::download(new AllHasilTagihanExport, 'hasil_rekon_semua_sheet.xlsx');
-  }
+        if ($sheet) {
+            return Excel::download(new HasilTagihanExport($sheet), "hasil_rekon_{$sheet}.xlsx");
+        }
+
+        return Excel::download(new AllHasilTagihanExport, 'hasil_rekon_semua_sheet.xlsx');
+    }
 }

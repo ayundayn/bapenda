@@ -6,10 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class HasilTagihan extends Model
 {
-    // Sesuaikan nama tabel kalau tidak pakai plural default Laravel
     protected $table = 'hasil_tagihan';
 
-    // Kolom-kolom yang boleh diisi pakai mass assignment (seperti create())
     protected $fillable = [
         'nop_bank',
         'nominal_bank',
@@ -17,6 +15,23 @@ class HasilTagihan extends Model
         'nominal_vtax',
         'selisih',
         'sheet_name',
-        'tanggal'
+        'tanggal',
+        'tahun',
     ];
+
+    /**
+     * Ambil semua tahun unik sebagai string dipisah koma
+     *
+     * @return string
+     */
+    public static function getTahunUnikString()
+    {
+        $tahunUnik = self::selectRaw('YEAR(tanggal) as tahun')
+                    ->distinct()
+                    ->orderBy('tahun', 'desc')
+                    ->pluck('tahun')
+                    ->toArray();
+
+        return implode(', ', $tahunUnik);
+    }
 }

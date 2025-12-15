@@ -12,6 +12,7 @@ class HasilBank extends Model
         'nop',
         'nominal',
         'tanggal',
+        'tahun',
     ];
 
     public $timestamps = true;

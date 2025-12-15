@@ -14,6 +14,7 @@ class HasilVTax extends Model
         'nop',
         'nominal',
         'tanggal',
+        'tahun',
     ];
 
     // Timestamps aktif (default Laravel)

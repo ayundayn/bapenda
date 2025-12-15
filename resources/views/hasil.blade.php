@@ -8,6 +8,7 @@
 
 @section('content')
 
+{{-- Progress Bar --}}
 @if ($data->count() === 0)
   <div id="progressBox" style="display:none;">
     <div class="alert alert-info">
@@ -21,31 +22,31 @@
   </div>
 
   <script>
-  function checkProgress() {
-      fetch('/progress')
-          .then(res => res.json())
-          .then(data => {
-              if (!data) return;
+    function checkProgress() {
+        fetch('/progress')
+            .then(res => res.json())
+            .then(data => {
+                if (!data) return;
 
-              document.getElementById('progressBox').style.display = 'block';
-              document.getElementById('progressText').innerText =
-                  `${data.processed} / ${data.total}`;
+                document.getElementById('progressBox').style.display = 'block';
+                document.getElementById('progressText').innerText =
+                    `${data.processed} / ${data.total}`;
 
-              const percent = data.total > 0
-                  ? (data.processed / data.total * 100)
-                  : 0;
+                const percent = data.total > 0
+                    ? (data.processed / data.total * 100)
+                    : 0;
 
-              document.getElementById('progressBar').style.width = percent + '%';
+                document.getElementById('progressBar').style.width = percent + '%';
 
-              if (data.status !== 'done') {
-                  setTimeout(checkProgress, 1500);
-              } else {
-                  location.reload();
-              }
-          });
-  }
+                if (data.status !== 'done') {
+                    setTimeout(checkProgress, 1500);
+                } else {
+                    location.reload();
+                }
+            });
+    }
 
-  checkProgress();
+    checkProgress();
   </script>
 @endif
 
@@ -55,7 +56,7 @@
 
     <div class="d-flex flex-column flex-sm-row gap-2 align-items-start align-items-sm-center">
 
-      {{-- Dropdown Filter Sheet --}}
+      {{-- Filter Sheet --}}
       <form method="GET" class="d-flex align-items-center">
         <label for="sheet" class="me-2 mb-0">Sheet</label>
         <select name="sheet" id="sheet" class="form-select form-select-sm w-auto me-2" onchange="this.form.submit()">
@@ -67,11 +68,10 @@
           @endforeach
         </select>
 
-        {{-- Hidden input biar dropdown perPage ikut dikirim --}}
         <input type="hidden" name="perPage" value="{{ request('perPage', 10) }}">
       </form>
 
-      {{-- Dropdown Tampilkan Per Page --}}
+      {{-- Filter Per Page --}}
       <form method="GET" class="d-flex align-items-center">
         <label for="perPage" class="me-2 mb-0">Tampilkan</label>
         <select name="perPage" id="perPage" class="form-select form-select-sm w-auto me-2" onchange="this.form.submit()">
@@ -80,7 +80,6 @@
           @endforeach
         </select>
 
-        {{-- Hidden input biar dropdown sheet ikut dikirim --}}
         <input type="hidden" name="sheet" value="{{ request('sheet') }}">
       </form>
 
@@ -91,12 +90,20 @@
     </div>
   </div>
 
+  {{-- Tampilkan Tahun Unik --}}
+  @if(isset($tahunString) && $tahunString)
+    <div class="p-3">
+      <strong>Tahun tersedia:</strong> {{ $tahunString }}
+    </div>
+  @endif
+
   <div class="table-responsive text-nowrap">
     <table class="table table-hover">
       <thead class="table-light">
         <tr>
           <th>No</th>
           <th>Tanggal Bayar</th>
+          <th>Tahun</th>
           <th>NOP Bank</th>
           <th>Nominal Bank</th>
           <th>NOP VTax</th>
@@ -109,6 +116,7 @@
           <tr>
             <td>{{ ($data->currentPage() - 1) * $data->perPage() + $index + 1 }}</td>
             <td>{{ $row->tanggal ? \Carbon\Carbon::parse($row->tanggal)->format('d-m-Y') : '-' }}</td>
+            <td>{{ $row->tanggal ? \Carbon\Carbon::parse($row->tanggal)->format('Y') : '-' }}</td>
             <td>{{ $row->nop_bank ?? '-' }}</td>
             <td>Rp {{ number_format($row->nominal_bank, 0, ',', '.') }}</td>
             <td>{{ $row->nop_vtax ?? '-' }}</td>
@@ -117,7 +125,7 @@
           </tr>
         @empty
           <tr>
-            <td colspan="7" class="text-center text-muted">Tidak ada data ditampilkan.</td>
+            <td colspan="8" class="text-center text-muted">Tidak ada data ditampilkan.</td>
           </tr>
         @endforelse
       </tbody>
